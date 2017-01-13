@@ -11,9 +11,11 @@ namespace PuntIntermediateCompiler
     class Program
     {
         static private VMF vmf;
+        static private VBlock world;
         static private List<VBlock> entities;
         static private List<VBlock> instances;
         static private List<VBlock> flags;
+        static private List<VBlock> solids;
 
         static void Main(string[] args)
         {
@@ -37,11 +39,14 @@ namespace PuntIntermediateCompiler
         {
             bool hasChanged = false;
 
+            world = vmf.Body.Where(item => item.Name == "world" && item is VBlock).Cast<VBlock>().First();
             entities = vmf.Body.Where(item => item.Name == "entity").Select(item => item as VBlock).ToList();
             instances = entities.Where(entity => entity.Body.Where(item => item.Name == "classname" && (item as VProperty).Value == "func_instance").Count() > 0).ToList();
             flags = instances.Where(instance => instance.Body.Where(item => item.Name == "targetname" && (item as VProperty).Value.StartsWith("PuzzleMakerFlag_")).Count() > 0).ToList();
+            solids = world.Body.Where(property => property.Name == "solid" && property is VBlock).Cast<VBlock>().ToList();
 
-            hasChanged = Mod_COOPChanges() || hasChanged;
+            hasChanged = hasChanged | Mod_COOPChanges();
+            hasChanged = hasChanged | Mod_PTITextureChanges();
 
             return hasChanged;
         }
@@ -77,6 +82,33 @@ namespace PuntIntermediateCompiler
                 #endregion
 
                 hasChanged = true;
+            }
+
+            return hasChanged;
+        }
+
+        internal static bool Mod_PTITextureChanges()
+        {
+            bool hasChanged = false;
+
+            var sides = solids
+                .SelectMany(solid => solid.Body.Where(property => property.Name == "side" && property is VBlock))
+                .Cast<VBlock>();
+            var materialProperties = sides
+                .SelectMany(side => side.Body.Where(property => property.Name == "material" && property is VProperty))
+                .Cast<VProperty>();
+
+            foreach(var materialProperty in materialProperties)
+            {
+                switch(materialProperty.Value.ToUpper())
+                {
+                    case "TILE/WHITE_WALL_TILE003F": materialProperty.Value = "concrete/concretewall_blue"; hasChanged = true; break;
+                    case "TILE/WHITE_WALL_TILE003A": materialProperty.Value = "concrete/concretewall_blue"; hasChanged = true; break;
+                    case "TILE/WHITE_FLOOR_TILE002A": materialProperty.Value = "tile/officewall_tile_b_matte"; hasChanged = true; break;
+                    case "METAL/BLACK_WALL_METAL_002C": materialProperty.Value = "concrete/concretewall_red"; hasChanged = true; break;
+                    case "METAL/BLACK_WALL_METAL_002B": materialProperty.Value = "concrete/concretewall_red"; hasChanged = true; break;
+                    case "METAL/BLACK_FLOOR_METAL_001C": materialProperty.Value = "tile/officewall_tile_r_matte"; hasChanged = true; break;
+                }
             }
 
             return hasChanged;
